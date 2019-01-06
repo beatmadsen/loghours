@@ -16,6 +16,8 @@ public interface UserRepository {
 
     Optional<User> find(long id);
 
+    Optional<User> find(String email);
+
     User save(User user);
 
     class InMemory implements UserRepository {
@@ -39,16 +41,25 @@ public interface UserRepository {
         }
 
 
-        @Override
-        public Optional<User> find(long id) {
-            return Optional.ofNullable(usersById.get(id));
-        }
-
-
         private void storeAndRefreshIndex(User user) {
 
             usersById.put(user.getId(), user);
             emailIndex.put(user.getEmail(), user.getId());
+        }
+
+
+        @Override
+        public Optional<User> find(long id) {
+
+            return Optional.ofNullable(usersById.get(id));
+        }
+
+
+        @Override
+        public Optional<User> find(String email) {
+
+            return Optional.ofNullable(emailIndex.get(email))
+                    .map(id -> Optional.ofNullable(usersById.get(id)).orElseThrow());
         }
 
 

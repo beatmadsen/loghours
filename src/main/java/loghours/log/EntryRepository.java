@@ -15,6 +15,11 @@ public interface EntryRepository {
         return new InMemory(UserRepository.inMemory());
     }
 
+    static EntryRepository inMemory(UserRepository userRepository) {
+
+        return new InMemory(userRepository);
+    }
+
     Entry save(Entry entry);
 
     Optional<Entry> findByDay(String userEmail, LocalDateTime dayOfCheckIn);

@@ -8,8 +8,6 @@ public class User {
     private String email;
     private String firstName;
     private String lastName;
-
-
     public User(long id, String email, String firstName, String lastName) {
 
         this.id = id;
@@ -47,6 +45,12 @@ public class User {
     public long getId() {
 
         return id;
+    }
+
+
+    public void setId(long id) {
+
+        this.id = id;
     }
 
 
