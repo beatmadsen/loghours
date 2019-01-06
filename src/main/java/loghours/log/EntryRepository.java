@@ -15,9 +15,9 @@ public interface EntryRepository {
         return new InMemory(UserRepository.inMemory());
     }
 
-    void save(Entry entry);
+    Entry save(Entry entry);
 
-    Optional<Entry> findCheckedIn(String userEmail, LocalDateTime dayOfCheckIn);
+    Optional<Entry> findByDay(String userEmail, LocalDateTime dayOfCheckIn);
 
     List<Entry> findAllInWeek(String userEmail, LocalDateTime timeInWeek);
 
@@ -37,9 +37,9 @@ public interface EntryRepository {
         }
 
 
-        private static Entry copy(Entry original, long newId) {
+        private static Entry copy(Entry original, long newId, User newUser) {
 
-            return new Entry(newId, original.getCheckIn(), original.getCheckOut(), original.getStatus(), original.getUser());
+            return new Entry(newId, original.getCheckIn(), original.getCheckOut(), original.getStatus(), newUser);
         }
 
 
@@ -50,28 +50,30 @@ public interface EntryRepository {
 
 
         @Override
-        public synchronized void save(Entry entry) {
+        public synchronized Entry save(Entry entry) {
 
             var user = entry.getUser();
             if (user == null) throw new RuntimeException("User is required");
-            userRepository.save(user);
+
             if (entry.getId() == 0L) {
-                saveNew(entry);
-            } else {
-                saveChanged(entry);
+                return saveNew(entry);
             }
+            return saveChanged(entry);
         }
 
 
-        private void saveNew(Entry entry) {
+        private Entry saveNew(Entry entry) {
 
             var nextId = primaryKey.getAndIncrement();
-            var copy = copy(entry, nextId);
+            var userCopy = userRepository.save(entry.getUser());
+            // a matter of taste, but prefer to avoid side-effecting on input
+            var copy = copy(entry, nextId, userCopy);
             storeAndRefreshIndex(copy);
+            return copy;
         }
 
 
-        private void saveChanged(Entry entry) {
+        private Entry saveChanged(Entry entry) {
 
             var ids = emailIndex.get(entry.getUser().getEmail());
             if (ids == null || ids.isEmpty()) {
@@ -81,7 +83,13 @@ public interface EntryRepository {
                 // email was changed, but there were existing entries matching new email
                 throw new RuntimeException("email already exists");
             }
-            storeAndRefreshIndex(entry);
+            var userCopy = userRepository.save(entry.getUser());
+
+            // a matter of taste, but prefer to avoid side-effecting on input
+            var copy = copy(entry, userCopy);
+
+            storeAndRefreshIndex(copy);
+            return copy;
         }
 
 
@@ -103,17 +111,28 @@ public interface EntryRepository {
 
 
         @Override
-        public Optional<Entry> findCheckedIn(String userEmail, LocalDateTime dayOfCheckIn) {
+        public Optional<Entry> findByDay(String userEmail, LocalDateTime dayOfCheckIn) {
 
             var start = dayOfCheckIn.truncatedTo(ChronoUnit.DAYS);
             var stop = start.plusDays(1);
 
-            return findEntries(userEmail).stream()
-                    .filter(entry -> entry.getCheckIn().isAfter(start) && entry.getCheckIn().isBefore(stop))
-                    .findFirst();
+            return findEntries(userEmail, start, stop).findFirst();
         }
 
 
+        private Stream<Entry> findEntries(String userEmail, LocalDateTime start, LocalDateTime stop) {
+
+            return findEntries(userEmail).stream()
+                    .filter(entry -> entry.getCheckIn().isAfter(start) && entry.getCheckIn().isBefore(stop))
+                    .map(this::refreshUser);
+        }
+
+
+        /*
+         * NB: returns a list rather than a stream,
+         * because evaluation/resolution of lazy stream needs to happen
+         * inside synchronized scope
+         */
         private synchronized List<Entry> findEntries(String userEmail) {
 
             return emailIndex.getOrDefault(userEmail, Set.of())
@@ -123,16 +142,26 @@ public interface EntryRepository {
         }
 
 
+        private Entry refreshUser(Entry entry) {
+
+            var user = userRepository.find(entry.getId()).orElseThrow();
+            return copy(entry, user);
+        }
+
+
+        private static Entry copy(Entry entry, User newUser) {
+
+            return new Entry(entry.getId(), entry.getCheckIn(), entry.getCheckOut(), entry.getStatus(), newUser);
+        }
+
+
         @Override
         public List<Entry> findAllInWeek(String userEmail, LocalDateTime weekOfCheckIn) {
 
             var start = weekOfCheckIn.truncatedTo(ChronoUnit.DAYS).with(DayOfWeek.MONDAY);
             var stop = start.plusDays(7);
 
-            List<Entry> entries = findEntries(userEmail);
-
-            return entries.stream()
-                    .filter(entry -> entry.getCheckIn().isAfter(start) && entry.getCheckIn().isBefore(stop))
+            return findEntries(userEmail, start, stop)
                     .collect(Collectors.toList());
         }
     }

@@ -2,6 +2,7 @@ package loghours.log;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 public interface UserRepository {
@@ -13,7 +14,9 @@ public interface UserRepository {
 
     User findOrCreate(String email);
 
-    void save(User user);
+    Optional<User> find(long id);
+
+    User save(User user);
 
     class InMemory implements UserRepository {
 
@@ -36,6 +39,12 @@ public interface UserRepository {
         }
 
 
+        @Override
+        public Optional<User> find(long id) {
+            return Optional.ofNullable(usersById.get(id));
+        }
+
+
         private void storeAndRefreshIndex(User user) {
 
             usersById.put(user.getId(), user);
@@ -44,26 +53,27 @@ public interface UserRepository {
 
 
         @Override
-        public synchronized void save(User user) {
+        public synchronized User save(User user) {
 
             if (user.getEmail() == null) throw new RuntimeException("Email is required");
             if (user.getId() == 0L) {
-                saveNew(user);
-            } else {
-                saveChanged(user);
+                return saveNew(user);
             }
+            return saveChanged(user);
         }
 
 
-        private void saveNew(User user) {
+        private User saveNew(User user) {
 
             var nextId = primaryKey.getAndIncrement();
             var copy = copy(user, nextId);
             storeAndRefreshIndex(copy);
+            return copy;
         }
 
 
-        private void saveChanged(User user) {
+        private User saveChanged(User user) {
+
             var id = emailIndex.get(user.getEmail());
             if (id == null) {
                 // email was changed, new email not found
@@ -73,6 +83,7 @@ public interface UserRepository {
                 throw new RuntimeException("email already exists");
             }
             storeAndRefreshIndex(user);
+            return user;
         }
 
 

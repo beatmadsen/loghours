@@ -39,11 +39,12 @@ class UserRepositorySpec extends Specification {
         def user = new User(email: email, firstName: firstName, lastName: 'doe')
 
         when:
-        repo.save(user)
-        def u1 = repo.findOrCreate(email)
+        def u0 = repo.save(user)
+        def u1 = repo.find(u0.id).orElseThrow()
 
         then:
         u1.id != 0
+        u1.id == u0.id
         u1.email == email
         u1.firstName == firstName
     }
