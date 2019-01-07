@@ -2,11 +2,9 @@ package loghours.log;
 
 import java.time.LocalDateTime;
 
-public interface Service {
+public interface EntryService {
 
     void checkIn(String userEmail, LocalDateTime time);
 
     void checkOut(String userEmail, LocalDateTime time);
-
-    void updateUser(String email, String firstName, String lastName);
 }

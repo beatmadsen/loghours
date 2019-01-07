@@ -6,24 +6,21 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
-import loghours.log.EntryRepository;
 import loghours.log.User;
-import loghours.log.UserRepository;
+import loghours.log.UserService;
 
 import java.util.stream.Collectors;
 
 
 public class Server extends AbstractVerticle {
 
-    private UserRepository userRepository;
-    private EntryRepository entryRepository;
+    private UserService userService;
 
 
     @Override
     public void start() {
 
-        userRepository = UserRepository.inMemory();
-        entryRepository = EntryRepository.inMemory(userRepository);
+        userService = UserService.inMemory();
 
         var router = Router.router(vertx);
         router.route().handler(BodyHandler.create());
@@ -42,10 +39,7 @@ public class Server extends AbstractVerticle {
         var emails = routingContext.queryParam("email");
         var response = routingContext.response();
         if (emails.size() == 1) {
-            var users = userRepository.find(emails.get(0))
-                    .stream()
-                    .map(Server::toJson)
-                    .collect(Collectors.toList());
+            var users = userService.findAll(emails.get(0)).map(Server::toJson).collect(Collectors.toList());
             // index type REST action expects array output
             var json = new JsonArray(users);
             response.putHeader("content-type", "application/json").end(json.encodePrettily());
@@ -60,13 +54,12 @@ public class Server extends AbstractVerticle {
         var user = fromJson(routingContext.getBodyAsJson());
         var response = routingContext.response();
 
-        userRepository.find(user.getEmail()).ifPresentOrElse(
-                u -> response.setStatusCode(409).end(),
-                () -> {
-                    var json = toJson(userRepository.save(user));
-                    response.putHeader("content-type", "application/json")
-                            .end(json.encodePrettily());
-                }
+        userService.create(user).ifPresentOrElse(
+                saved -> {
+                    var jsonOut = toJson(saved).encodePrettily();
+                    response.putHeader("content-type", "application/json").end(jsonOut);
+                },
+                () -> response.setStatusCode(409).end()
         );
     }
 
@@ -77,7 +70,7 @@ public class Server extends AbstractVerticle {
             var id = Long.parseLong(routingContext.pathParam("id"));
             var response = routingContext.response();
 
-            userRepository.find(id).map(Server::toJson).ifPresentOrElse(
+            userService.find(id).map(Server::toJson).ifPresentOrElse(
                     json -> response
                             .putHeader("content-type", "application/json")
                             .end(json.encodePrettily()),
@@ -95,11 +88,12 @@ public class Server extends AbstractVerticle {
             var id = Long.parseLong(routingContext.pathParam("id"));
             var response = routingContext.response();
 
-            userRepository.find(id).ifPresentOrElse(
-                    u -> {
-                        var json = updateUser(id, routingContext.getBodyAsJson());
+            var delta = fromJson(routingContext.getBodyAsJson());
+            userService.update(id, delta).ifPresentOrElse(
+                    updated -> {
+                        var jsonOut = toJson(updated).encodePrettily();
                         response.putHeader("content-type", "application/json")
-                                .end(json.encodePrettily());
+                                .end(jsonOut);
                     },
                     () -> response.setStatusCode(404).end()
             );
@@ -127,13 +121,5 @@ public class Server extends AbstractVerticle {
         user.setLastName(json.getString("last_name"));
         user.setFirstName(json.getString("first_name"));
         return user;
-    }
-
-
-    private JsonObject updateUser(long id, JsonObject body) {
-
-        var delta = fromJson(body);
-        delta.setId(id);
-        return toJson(userRepository.save(delta));
     }
 }

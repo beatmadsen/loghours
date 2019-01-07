@@ -77,7 +77,8 @@ public interface UserRepository {
         private User saveNew(User user) {
 
             var nextId = primaryKey.getAndIncrement();
-            var copy = copy(user, nextId);
+
+            var copy = user.withId(nextId);
             storeAndRefreshIndex(copy);
             return copy;
         }
@@ -95,12 +96,6 @@ public interface UserRepository {
             }
             storeAndRefreshIndex(user);
             return user;
-        }
-
-
-        private static User copy(User original, long nextId) {
-
-            return new User(nextId, original.getEmail(), original.getFirstName(), original.getLastName());
         }
 
 

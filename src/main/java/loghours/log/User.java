@@ -21,6 +21,10 @@ public class User {
 
     }
 
+    public User withId(long id) {
+        return new User(id, email, firstName, lastName);
+    }
+
 
     @Override
     public boolean equals(Object o) {
