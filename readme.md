@@ -12,7 +12,7 @@ a simple service that lets you check in and check out from work
 ## TODOs
 
 - [x] UserService
-- [ ] Multiple vertx handlers
+- [x] Multiple vertx routers
 - [ ] Entry post actions
 - [ ] Entry get actions
 
