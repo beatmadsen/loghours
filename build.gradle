@@ -1,19 +1,42 @@
 plugins {
     id 'java'
     id 'groovy'
+    id 'application'
+//    id 'com.github.johnrengelman.shadow' version '4.0.3'
 }
 
 group 'madsen'
 version '1.0-SNAPSHOT'
+mainClassName = 'io.vertx.core.Launcher'
 
 sourceCompatibility = 1.11
 
+
+def mainVerticleName = 'loghours.web.Server'
+def watchForChange = 'src/**/*'
+def doOnChange = './gradlew classes'
+
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 dependencies {
     compile 'io.vertx:vertx-web:3.6.2'
     testImplementation 'org.codehaus.groovy:groovy-all:2.4.15'
     testCompile "org.spockframework:spock-core:1.1-groovy-2.4-rc-2"
+}
+//
+//shadowJar {
+//    classifier = 'fat'
+//    manifest {
+//        attributes 'Main-Verticle': mainVerticleName
+//    }
+//    mergeServiceFiles {
+//        include 'META-INF/services/io.vertx.core.spi.VerticleFactory'
+//    }
+//}
+
+run {
+    args = ['run', mainVerticleName, "--redeploy=$watchForChange", "--launcher-class=$mainClassName", "--on-redeploy=$doOnChange"]
 }
